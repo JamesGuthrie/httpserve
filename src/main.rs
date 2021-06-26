@@ -1,6 +1,6 @@
 use clap::{App, Arg};
 use hyper::service::{make_service_fn, service_fn};
-use hyper::{Body, Method, Request, Response, Server, StatusCode, Uri};
+use hyper::{Body, Method, Request, Response, Server, StatusCode};
 use log::{debug, error, info, warn};
 use simplelog::{ColorChoice, ConfigBuilder, LevelFilter, TermLogger, TerminalMode};
 use std::collections::{HashMap, VecDeque};
@@ -9,7 +9,6 @@ use std::fs;
 use std::fs::read;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::path::PathBuf;
-use std::str::FromStr;
 use std::sync::Arc;
 
 #[tokio::main]
@@ -147,13 +146,15 @@ impl FileServer {
         info!("{} {}", method, uri);
         match *method {
             Method::GET => {
-                let uri = if uri.eq("/") {
-                    Uri::from_str("/index.html").unwrap()
-                } else {
-                    uri.clone()
-                };
-                let path = uri.to_string();
-                let maybe_body = self.cache.get(&*path);
+                let path = uri.path().to_string();
+                let maybe_body = self.cache.get(&*path).or_else(|| {
+                    if uri.path().ends_with("/") {
+                        let fallback_path = uri.path().to_string() + "index.html";
+                        self.cache.get(&*fallback_path)
+                    } else {
+                        None
+                    }
+                });
                 maybe_body.map_or(
                     Ok::<_, Infallible>(
                         Response::builder()
