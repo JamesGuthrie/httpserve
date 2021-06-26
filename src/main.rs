@@ -59,6 +59,7 @@ fn parse_config() -> Config {
             Arg::with_name("DIR")
                 .value_name("DIR")
                 .help("Set the directory to serve")
+                .required(true)
                 .takes_value(true),
         )
         .arg(
