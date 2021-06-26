@@ -1,0 +1,12 @@
+[package]
+name = "httpserve"
+version = "0.1.0"
+authors = ["James Guthrie <james@prodigi.ch>"]
+edition = "2018"
+
+[dependencies]
+clap = "2.33.3"
+hyper = { version = "0.14", features = ["full"] }
+log = "0.4.14"
+simplelog = "0.10.0"
+tokio = { version = "1", features = ["full"] }
