@@ -1,6 +1,6 @@
 [package]
 name = "httpserve"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["James Guthrie <james@prodigi.ch>"]
 edition = "2018"
 
