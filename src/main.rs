@@ -1,4 +1,4 @@
-use clap::{App, Arg};
+use clap::{crate_version, App, Arg};
 use hyper::header::LOCATION;
 use hyper::http::uri::Builder;
 use hyper::service::{make_service_fn, service_fn};
@@ -57,7 +57,7 @@ struct Config {
 
 fn parse_config() -> Config {
     let matches = App::new("httpserve")
-        .version("0.1")
+        .version(crate_version!())
         .author("James Guthrie")
         .about("Serve files from a directory")
         .arg(
