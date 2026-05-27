@@ -1,4 +1,4 @@
-FROM rust:1.52 as builder
+FROM rust:1.95 as builder
 
 RUN USER=root cargo new --bin httpserve
 WORKDIR ./httpserve
