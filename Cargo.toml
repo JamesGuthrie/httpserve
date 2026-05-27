@@ -2,7 +2,7 @@
 name = "httpserve"
 version = "0.2.0"
 authors = ["James Guthrie <james@prodigi.ch>"]
-edition = "2018"
+edition = "2024"
 
 [dependencies]
 clap = { version = "4.6.1", features = ["derive"] }
