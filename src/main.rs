@@ -1,4 +1,4 @@
-use clap::{crate_version, App, Arg};
+use clap::Parser;
 use http_body_util::combinators::BoxBody;
 use http_body_util::{BodyExt, Empty, Full};
 use hyper::body::{Bytes, Incoming};
@@ -15,7 +15,7 @@ use std::collections::{HashMap, VecDeque};
 use std::convert::Infallible;
 use std::fs;
 use std::fs::read;
-use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::net::{IpAddr, SocketAddr};
 use std::path::PathBuf;
 use std::pin::pin;
 use std::sync::Arc;
@@ -23,10 +23,29 @@ use std::time::Duration;
 use time::macros::format_description;
 use tokio::net::TcpListener;
 
+#[derive(Parser)]
+#[command(version, about, long_about = None)]
+struct Cli {
+    /// Sets the directory to serve
+    dir: String,
+
+    /// Sets the address to listen on
+    #[arg(short, long, value_name = "ADDRESS", default_value = "127.0.0.1")]
+    address: IpAddr,
+
+    /// Sets the address to listen on
+    #[arg(short, long, value_name = "PORT", default_value_t = 3000)]
+    port: u16,
+
+    /// Redirect http to https
+    #[arg(short, long)]
+    redirect_http: bool,
+}
+
 #[tokio::main]
 async fn main() {
     configure_logging();
-    let config = parse_config();
+    let config = Cli::parse();
     info!("Starting httpserve on {}:{}", config.address, config.port);
     let addr = SocketAddr::from((config.address, config.port));
 
@@ -79,67 +98,6 @@ async fn main() {
         _ = tokio::time::sleep(Duration::from_secs(10)) => {
             warn!("timed out waiting for connections to close");
         }
-    }
-}
-
-struct Config {
-    dir: String,
-    address: IpAddr,
-    port: u16,
-    redirect_http: bool,
-}
-
-fn parse_config() -> Config {
-    let matches = App::new("httpserve")
-        .version(crate_version!())
-        .author("James Guthrie")
-        .about("Serve files from a directory")
-        .arg(
-            Arg::with_name("DIR")
-                .value_name("DIR")
-                .help("Set the directory to serve")
-                .required(true)
-                .takes_value(true),
-        )
-        .arg(
-            Arg::with_name("port")
-                .short("p")
-                .long("port")
-                .value_name("PORT")
-                .help("Set the port to listen on")
-                .takes_value(true),
-        )
-        .arg(
-            Arg::with_name("address")
-                .short("a")
-                .long("address")
-                .value_name("ADDRESS")
-                .help("Sets the address to bind to")
-                .takes_value(true),
-        )
-        .arg(
-            Arg::with_name("redirect")
-                .short("r")
-                .long("redirect-http")
-                .help("Whether to redirect http to https"),
-        )
-        .get_matches();
-
-    let dir = matches.value_of("DIR").unwrap().to_string();
-    let address = matches
-        .value_of("address")
-        .map_or(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), |addr| {
-            addr.parse::<IpAddr>().expect("Unable to parse IP address")
-        });
-    let port = matches.value_of("port").map_or(3000, |p| {
-        p.parse::<u16>().expect("Unable to parse port number")
-    });
-    let redirect_http = matches.is_present("redirect");
-    Config {
-        dir,
-        address,
-        port,
-        redirect_http,
     }
 }
 
