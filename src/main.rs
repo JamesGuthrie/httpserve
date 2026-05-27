@@ -20,6 +20,7 @@ use std::path::PathBuf;
 use std::pin::pin;
 use std::sync::Arc;
 use std::time::Duration;
+use time::macros::format_description;
 use tokio::net::TcpListener;
 
 #[tokio::main]
@@ -145,7 +146,9 @@ fn parse_config() -> Config {
 fn configure_logging() {
     let config = ConfigBuilder::new()
         .set_target_level(LevelFilter::Trace)
-        .set_time_format(String::from("%Y-%m-%dT%H:%M:%S%.3f"))
+        .set_time_format_custom(format_description!(
+            "[year]-[month]-[day]T[hour]:[minute]:[second].[subsecond digits:3]Z"
+        ))
         .build();
     let _ = TermLogger::init(
         LevelFilter::Debug,
