@@ -1,3 +1,6 @@
+pub mod mmapped_cache;
+
+use crate::mmapped_cache::{InsertError, MMappedCache};
 use clap::Parser;
 use http_body_util::combinators::BoxBody;
 use http_body_util::{BodyExt, Empty, Full};
@@ -11,7 +14,7 @@ use hyper_util::server::conn::auto::Builder;
 use hyper_util::server::graceful::GracefulShutdown;
 use log::{debug, error, info, warn};
 use simplelog::{ColorChoice, ConfigBuilder, LevelFilter, TermLogger, TerminalMode};
-use std::collections::{HashMap, VecDeque};
+use std::collections::VecDeque;
 use std::convert::Infallible;
 use std::fs;
 use std::fs::read;
@@ -20,6 +23,7 @@ use std::path::PathBuf;
 use std::pin::pin;
 use std::sync::Arc;
 use std::time::Duration;
+use thiserror::Error;
 use time::macros::format_description;
 use tokio::net::TcpListener;
 
@@ -40,19 +44,29 @@ struct Cli {
     /// Whether to redirect http to https
     #[arg(short, long)]
     redirect_http: bool,
+
+    /// Maxiumum cache size
+    #[arg(short, long, default_value_t = 256)]
+    max_cache_size_mib: usize,
 }
 
+const MIB_IN_B: usize = 1024 * 1024;
+
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     configure_logging();
     let config = Cli::parse();
+
     info!("Starting httpserve on {}:{}", config.address, config.port);
     let addr = SocketAddr::from((config.address, config.port));
 
-    let file_server = Arc::new(FileServer::new(
+    let file_server = FileServer::new(
         PathBuf::from(config.dir),
         config.redirect_http,
-    ));
+        config.max_cache_size_mib * MIB_IN_B,
+    );
+
+    let file_server = Arc::new(file_server?);
 
     let listener = TcpListener::bind(&addr)
         .await
@@ -99,6 +113,7 @@ async fn main() {
             warn!("timed out waiting for connections to close");
         }
     }
+    Ok(())
 }
 
 fn configure_logging() {
@@ -117,13 +132,25 @@ fn configure_logging() {
 }
 
 struct FileServer {
-    cache: HashMap<String, Vec<u8>>,
+    cache: MMappedCache<String>,
     http_to_https_redirect: bool,
 }
 
+#[derive(Debug, Error)]
+enum FileServerError {
+    #[error("Failed to allocate memory: {0}")]
+    RegionError(region::Error),
+    #[error("Ran out of space filling cache: {0}")]
+    InsertError(InsertError),
+}
+
 impl FileServer {
-    pub fn new(dir: PathBuf, http_to_https_redirect: bool) -> FileServer {
-        let mut cache: HashMap<String, Vec<u8>> = HashMap::new();
+    pub fn new(
+        dir: PathBuf,
+        http_to_https_redirect: bool,
+        max_cache_size: usize,
+    ) -> Result<FileServer, FileServerError> {
+        let mut cache = MMappedCache::new(max_cache_size).map_err(FileServerError::RegionError)?;
         let mut to_visit: VecDeque<PathBuf> = VecDeque::from(vec![dir.clone()]);
         while !to_visit.is_empty() {
             match to_visit.pop_front() {
@@ -142,7 +169,9 @@ impl FileServer {
                             .unwrap();
                         let content = read(item).expect("Failed to read file");
                         debug!("Loaded {} bytes from {}", content.len(), path);
-                        cache.insert(path.to_owned(), content);
+                        cache
+                            .insert(path.to_owned(), content.as_slice())
+                            .map_err(FileServerError::InsertError)?;
                     }
                 }
                 None => {
@@ -150,10 +179,11 @@ impl FileServer {
                 }
             }
         }
-        FileServer {
+        info!("Loaded bytes into cache: {:?}", cache.size());
+        Ok(FileServer {
             cache,
             http_to_https_redirect,
-        }
+        })
     }
 
     async fn handle(
@@ -169,22 +199,22 @@ impl FileServer {
             Method::GET => {
                 self.build_https_redirect(&req).unwrap_or_else(|| {
                     let mut path = uri.path().to_string();
-                    if !self.cache.contains_key(&*path) {
+                    if !self.cache.contains_key(&path) {
                         // apply a simple fallback rule to fetch index.html
                         if uri.path().ends_with("/") {
                             path = uri.path().to_string() + "index.html";
                         }
                     }
-                    let maybe_body = self.cache.get(&*path);
-                    match maybe_body {
-                        Some(body) => Response::builder()
+                    if let Some(body) = self.cache.get(&path) {
+                        Response::builder()
                             .status(StatusCode::OK)
                             .body(Full::new(Bytes::from(body.to_owned())).boxed())
-                            .expect("Unable to create `http::Response`"),
-                        None => Response::builder()
+                            .expect("Unable to create `http::Response`")
+                    } else {
+                        Response::builder()
                             .status(StatusCode::NOT_FOUND)
                             .body(Empty::new().boxed())
-                            .expect("Unable to create `http::Response`"),
+                            .expect("Unable to create `http::Response`")
                     }
                 })
             }
