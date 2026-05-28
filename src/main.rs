@@ -26,18 +26,18 @@ use tokio::net::TcpListener;
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
 struct Cli {
-    /// Sets the directory to serve
+    /// The directory to serve
     dir: String,
 
-    /// Sets the address to listen on
+    /// The address to listen on
     #[arg(short, long, value_name = "ADDRESS", default_value = "127.0.0.1")]
     address: IpAddr,
 
-    /// Sets the address to listen on
+    /// The port to listen on
     #[arg(short, long, value_name = "PORT", default_value_t = 3000)]
     port: u16,
 
-    /// Redirect http to https
+    /// Whether to redirect http to https
     #[arg(short, long)]
     redirect_http: bool,
 }

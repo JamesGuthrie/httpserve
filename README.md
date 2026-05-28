@@ -9,22 +9,16 @@ httpserve --address 0.0.0.0 --port 3000 /path/to/files
 ```
 
 ```
-httpserve 0.2.0
-James Guthrie
-Serve files from a directory
+Usage: httpserve [OPTIONS] <DIR>
 
-USAGE:
-    httpserve [FLAGS] [OPTIONS] <DIR>
+Arguments:
+  <DIR>  The directory to serve
 
-FLAGS:
-    -h, --help             Prints help information
-    -r, --redirect-http    Whether to redirect http to https
-    -V, --version          Prints version information
-
-OPTIONS:
-    -a, --address <ADDRESS>    Sets the address to bind to
-    -p, --port <PORT>          Set the port to listen on
-
-ARGS:
-    <DIR>    Set the directory to serve
+Options:
+  -a, --address <ADDRESS>  The address to listen on [default: 127.0.0.1]
+  -p, --port <PORT>        The port to listen on [default: 3000]
+  -r, --redirect-http      Whether to redirect http to https
+  -h, --help               Print help
+  -V, --version            Print version
 ```
+
