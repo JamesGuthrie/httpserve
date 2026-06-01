@@ -5,7 +5,7 @@ use clap::Parser;
 use http_body_util::combinators::BoxBody;
 use http_body_util::{BodyExt, Empty, Full};
 use hyper::body::{Bytes, Incoming};
-use hyper::header::LOCATION;
+use hyper::header::{CONTENT_TYPE, LOCATION};
 use hyper::http::uri::Builder as UriBuilder;
 use hyper::service::service_fn;
 use hyper::{Method, Request, Response, StatusCode};
@@ -193,7 +193,6 @@ impl FileServer {
         let method = req.method();
         let uri = req.uri();
 
-        info!("{} {}", method, uri);
 
         let response = match *method {
             Method::GET => {
@@ -206,11 +205,17 @@ impl FileServer {
                         }
                     }
                     if let Some(body) = self.cache.get(&path) {
-                        Response::builder()
-                            .status(StatusCode::OK)
+                        info!("{} {} {}", StatusCode::OK.as_u16(), method, uri);
+                        let mut response = Response::builder()
+                            .status(StatusCode::OK);
+                        if let Some(mime_type) = mime_guess::from_path(&path).first() {
+                            response = response.header(CONTENT_TYPE, mime_type.essence_str());
+                        }
+                        response
                             .body(Full::new(Bytes::from(body.to_owned())).boxed())
                             .expect("Unable to create `http::Response`")
                     } else {
+                        info!("{} {} {}", StatusCode::NOT_FOUND.as_u16(), method, uri);
                         Response::builder()
                             .status(StatusCode::NOT_FOUND)
                             .body(Empty::new().boxed())
